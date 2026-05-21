@@ -1,0 +1,48 @@
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Claude Code per-user settings
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+*.cover
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Logs / data
+*.log
+logs/
+data/
+minio-data/
+pgdata/
+
+# Playwright
+test-results/
+playwright-report/
+.playwright/
+
+# Local CV samples
+samples/
