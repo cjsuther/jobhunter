@@ -44,5 +44,11 @@ test-results/
 playwright-report/
 .playwright/
 
+# Celery / Flower runtime state
+backend/celerybeat-schedule
+backend/celerybeat-schedule.*
+backend/flower
+backend/flower.*
+
 # Local CV samples
 samples/
