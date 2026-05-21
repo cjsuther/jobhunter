@@ -16,18 +16,25 @@ from uuid import UUID
 from anthropic import AsyncAnthropic
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from app.config import get_settings
 from app.logging_setup import get_logger
+from app.services.api_keys import resolve_anthropic_key
 from app.services.llm_pricing import compute_cost_usd
 
 log = get_logger("app.services.llm")
 
 
-def _client() -> AsyncAnthropic:
-    settings = get_settings()
-    if not settings.anthropic_api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY not configured")
-    return AsyncAnthropic(api_key=settings.anthropic_api_key)
+class AnthropicKeyMissing(RuntimeError):
+    """Raised when no usable Anthropic key is configured for the caller."""
+
+
+def _client(user_id: UUID | None = None) -> AsyncAnthropic:
+    key = resolve_anthropic_key(user_id)
+    if not key:
+        raise AnthropicKeyMissing(
+            "No hay API key de Anthropic configurada. "
+            "Configurala en Settings → Cuenta o en .env."
+        )
+    return AsyncAnthropic(api_key=key)
 
 
 def _record_call(
@@ -111,9 +118,9 @@ async def complete(
 
     `user_id` + `purpose` are persisted with the usage stats for cost tracking.
     Pass them from each call site (scoring / generation / cv_parse / …).
+    The Anthropic key is resolved from the user's DB-stored value first, then
+    the global env var.
     """
-    client = _client()
-
     if isinstance(system, str):
         system_param = [
             {
@@ -130,6 +137,7 @@ async def complete(
     else:
         user_content = user
 
+    client = _client(user_id=user_id)
     log.debug("llm.complete", model=model, purpose=purpose, max_tokens=max_tokens)
     resp = await client.messages.create(
         model=model,

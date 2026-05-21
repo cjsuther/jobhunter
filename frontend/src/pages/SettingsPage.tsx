@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import type { ProfileSummary } from "@/types/api";
 import { ProfileEditor } from "@/components/ProfileEditor";
+import { AnthropicKeyPanel } from "@/components/AnthropicKeyPanel";
 
 export default function SettingsPage() {
   const qc = useQueryClient();
@@ -44,7 +45,13 @@ export default function SettingsPage() {
   if (isLoading) return <p className="text-sm text-mutedForeground">Cargando perfiles…</p>;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+    <div className="space-y-4">
+      <section className="rounded-lg border bg-white p-4">
+        <h2 className="mb-3 font-medium">API key de Anthropic</h2>
+        <AnthropicKeyPanel />
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
       <aside className="space-y-3">
         <div className="rounded-lg border bg-white p-3">
           <p className="mb-2 text-sm font-medium">Mis perfiles</p>
@@ -146,6 +153,7 @@ export default function SettingsPage() {
           </p>
         )}
       </section>
+      </div>
     </div>
   );
 }

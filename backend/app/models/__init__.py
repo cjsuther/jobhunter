@@ -9,6 +9,7 @@ from app.models.portal_session import PortalSession
 from app.models.profile import Profile
 from app.models.search_criteria import SearchCriteria
 from app.models.user import User
+from app.models.user_secret import UserSecret
 
 __all__ = [
     "Application",
@@ -21,4 +22,5 @@ __all__ = [
     "SearchCriteria",
     "User",
     "UserJobMatch",
+    "UserSecret",
 ]

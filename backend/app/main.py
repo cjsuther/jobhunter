@@ -12,6 +12,7 @@ from slowapi.util import get_remote_address
 from app.config import get_settings
 from app.logging_setup import configure_logging, get_logger
 from app.routers import (
+    account,
     admin,
     auth,
     costs,
@@ -77,6 +78,7 @@ async def health() -> dict[str, str]:
 # Routers
 API_PREFIX = "/api/v1"
 app.include_router(auth.router, prefix=f"{API_PREFIX}/auth", tags=["auth"])
+app.include_router(account.router, prefix=f"{API_PREFIX}/account", tags=["account"])
 app.include_router(profiles.router, prefix=f"{API_PREFIX}/profiles", tags=["profiles"])
 app.include_router(
     criteria.profile_criteria_router,
