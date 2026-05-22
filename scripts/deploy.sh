@@ -41,7 +41,31 @@ fi
 if ! command -v docker >/dev/null 2>&1; then
   fail "docker no está instalado. Descargá Docker Desktop de https://docker.com/products/docker-desktop"
 fi
-docker info >/dev/null 2>&1 || fail "Docker no está corriendo. Abrí Docker Desktop y volvé a intentar."
+
+# If the Docker daemon isn't responding, try to launch Docker Desktop on macOS
+# and wait for it to become ready. Linux servers don't have Desktop — fall back
+# to the same "start it yourself" failure there.
+start_docker_if_needed() {
+  if docker info >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ "$(uname -s)" == "Darwin" ]] && [[ -d "/Applications/Docker.app" ]]; then
+    info "Docker no está corriendo — iniciando Docker Desktop"
+    open -a Docker
+    # Docker Desktop typically needs 20-50s on first start.
+    for i in $(seq 1 60); do
+      if docker info >/dev/null 2>&1; then
+        ok "Docker Desktop arriba (tras ${i}s)"
+        return 0
+      fi
+      sleep 2
+    done
+    fail "Docker Desktop no respondió después de 120s. Abrilo manualmente y volvé a correr."
+  fi
+  fail "Docker no está corriendo. Iniciá el daemon (Docker Desktop en Mac, 'systemctl start docker' en Linux) y reintentá."
+}
+start_docker_if_needed
+
 docker compose version >/dev/null 2>&1 || fail "Necesitás Docker Compose v2 (incluido en Docker Desktop reciente)."
 command -v python3 >/dev/null 2>&1 || warn "python3 no encontrado — se va a pedir si llega el momento de generar secretos."
 ok "git, docker y docker compose listos"

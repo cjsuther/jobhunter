@@ -24,7 +24,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--email", default=settings.bootstrap_admin_email)
     parser.add_argument("--password", default=settings.bootstrap_admin_password)
-    parser.add_argument("--name", default="Admin")
+    parser.add_argument("--name", default="admin")
     args = parser.parse_args()
 
     if not args.email or not args.password:
