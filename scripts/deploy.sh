@@ -35,10 +35,15 @@ require() {
 
 # ---- 0. Prerequisites ------------------------------------------------------
 bold "1/5  Verificando dependencias"
-require git
-require docker
+if ! command -v git >/dev/null 2>&1; then
+  fail "git no está instalado. En macOS, corré: xcode-select --install"
+fi
+if ! command -v docker >/dev/null 2>&1; then
+  fail "docker no está instalado. Descargá Docker Desktop de https://docker.com/products/docker-desktop"
+fi
 docker info >/dev/null 2>&1 || fail "Docker no está corriendo. Abrí Docker Desktop y volvé a intentar."
 docker compose version >/dev/null 2>&1 || fail "Necesitás Docker Compose v2 (incluido en Docker Desktop reciente)."
+command -v python3 >/dev/null 2>&1 || warn "python3 no encontrado — se va a pedir si llega el momento de generar secretos."
 ok "git, docker y docker compose listos"
 
 # ---- 1. Clone or update ----------------------------------------------------
@@ -69,21 +74,53 @@ ok "Código en $(pwd) — commit $(git rev-parse --short HEAD)"
 
 # ---- 2. .env ---------------------------------------------------------------
 bold "3/5  Verificando .env"
+
+# Helper: generate a random value (first-run secret bootstrap).
+gen_fernet() {
+  # 32 random bytes → url-safe base64 — exactly what cryptography.fernet expects.
+  python3 -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+}
+gen_token() {
+  python3 -c "import secrets; print(secrets.token_urlsafe(${1:-48}))"
+}
+
+# Replace a KEY=value line in .env in-place. macOS sed needs '' after -i.
+replace_env() {
+  local key="$1" value="$2"
+  local esc_value="${value//|/\\|}"
+  sed -i.bak "s|^${key}=.*|${key}=${esc_value}|" .env && rm -f .env.bak
+}
+
 if [[ ! -f .env ]]; then
   cp .env.example .env
-  warn "Se creó .env desde .env.example."
-  warn "Necesitás editar al menos ANTHROPIC_API_KEY antes de continuar."
-  if [[ "${JOBHUNTER_SKIP_EDIT:-0}" != "1" ]]; then
-    info "Apretá Enter para abrir .env en ${EDITOR:-nano}, o Ctrl+C para hacerlo manual."
-    read -r _
-    "${EDITOR:-nano}" .env
+  info "Generando secretos de infraestructura (Postgres / JWT / Fernet / MinIO)…"
+  if ! command -v python3 >/dev/null 2>&1; then
+    fail "Necesito python3 para generar secretos. En macOS: 'brew install python' o usá Xcode CLT."
   fi
+  pg_pass="$(gen_token 24)"
+  replace_env "POSTGRES_PASSWORD" "$pg_pass"
+  replace_env "JWT_SECRET" "$(gen_token 64)"
+  replace_env "MASTER_ENCRYPTION_KEY" "$(gen_fernet)"
+  replace_env "MINIO_SECRET_KEY" "$(gen_token 24)"
+  replace_env "DATABASE_URL" \
+    "postgresql+psycopg://jobhunter:${pg_pass}@postgres:5432/jobhunter"
+  replace_env "DATABASE_URL_SYNC" \
+    "postgresql+psycopg://jobhunter:${pg_pass}@postgres:5432/jobhunter"
+  # ANTHROPIC_API_KEY stays as the placeholder — it's optional now: configure it
+  # from Settings → API key de Anthropic in the UI after first boot.
+  ok ".env creado con secretos aleatorios"
+  warn "ANTHROPIC_API_KEY quedó como placeholder."
+  warn "Podés configurarla desde la UI (Settings → API key de Anthropic) o editar .env ahora."
+  if [[ "${JOBHUNTER_SKIP_EDIT:-0}" != "1" ]]; then
+    printf "\033[36m▸\033[0m Enter para abrir .env en %s, cualquier otra tecla + Enter para saltar: " "${EDITOR:-nano}"
+    read -r choice
+    if [[ -z "$choice" ]]; then
+      "${EDITOR:-nano}" .env
+    fi
+  fi
+else
+  ok ".env ya existe — no se toca"
 fi
-if grep -q "sk-ant-REPLACE_ME\|sk-ant-xxxxx" .env 2>/dev/null; then
-  warn "Tu .env todavía tiene el placeholder de ANTHROPIC_API_KEY."
-  warn "Las llamadas a Claude van a fallar hasta que pongas una key real."
-fi
-ok ".env listo"
 
 # ---- 3. Build --------------------------------------------------------------
 bold "4/5  Build de imágenes Docker"
@@ -119,5 +156,10 @@ echo "  Frontend:    http://localhost:5173"
 echo "  MinIO:       http://localhost:9001"
 echo "  Flower:      docker compose --profile monitoring up -d flower → http://localhost:5555"
 echo
-echo "Si es tu primera vez, creá el admin:"
-echo "  docker compose exec api python -m app.scripts.bootstrap_admin"
+echo "Próximos pasos (solo primera vez):"
+echo "  1. Crear el admin:"
+echo "       docker compose exec api python -m app.scripts.bootstrap_admin"
+echo "     (lee BOOTSTRAP_ADMIN_EMAIL / BOOTSTRAP_ADMIN_PASSWORD del .env;"
+echo "      default: admin@jobhunter.local / admin1234)"
+echo "  2. Entrar al frontend, login, y en Settings → API key de Anthropic"
+echo "     pegar tu sk-ant-... (la podés crear en https://console.anthropic.com)."
